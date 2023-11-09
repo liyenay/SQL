@@ -1,0 +1,162 @@
+/*
+
+Cleaning Data in SQL Queries
+
+*/
+
+Select *
+from PortfolioProject.dbo.Nashville_Housing
+
+-- Standardize date format
+
+/* Select SaleDate, CONVERT(Date, SaleDate) 
+from PortfolioProject.dbo.Nashville_Housing
+
+*/
+
+-- Populate Property Address data
+
+Select *
+from PortfolioProject.dbo.Nashville_Housing
+where PropertyAddress is NULL
+order by ParcelID
+
+select a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress) -- if it is null, take the address and put it there
+from PortfolioProject.dbo.Nashville_Housing a
+JOIN PortfolioProject.dbo.Nashville_Housing b
+    on a.ParcelID = b.ParcelID
+    and a.[UniqueID] <> b.[UniqueID]
+where a.PropertyAddress is null
+
+UPDATE a
+SET PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+from PortfolioProject.dbo.Nashville_Housing a
+JOIN PortfolioProject.dbo.Nashville_Housing b
+    on a.ParcelID = b.ParcelID
+    and a.[UniqueID] <> b.[UniqueID]
+where a.PropertyAddress is null
+
+
+
+-- Breaking out address into Individual Columns (Address, City, State)
+
+
+Select PropertyAddress
+from PortfolioProject.dbo.Nashville_Housing
+
+SELECT
+substring(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1) as Address,
+substring(PropertyAddress, CHARINDEX(',', PropertyAddress) +1, len(PropertyAddress)) as Address
+
+from PortfolioProject.dbo.Nashville_Housing
+
+
+ALTER TABLE Nashville_Housing
+Add PropertySplitAddress Nvarchar(255);
+
+Update Nashville_Housing
+Set PropertySplitAddress = substring(PropertyAddress, 1, CHARINDEX(',', PropertyAddress) -1)
+
+ALTER TABLE Nashville_Housing
+Add PropertySplitCity Nvarchar(255);
+
+Update Nashville_Housing
+Set PropertySplitCity = substring(PropertyAddress, CHARINDEX(',', PropertyAddress) +1, len(PropertyAddress))
+
+
+Select *
+from PortfolioProject.dbo.Nashville_Housing
+
+
+
+Select OwnerAddress
+from PortfolioProject.dbo.Nashville_Housing
+
+SELECT
+PARSENAME (replace(OwnerAddress, ',', '.'), 3),
+PARSENAME (replace(OwnerAddress, ',', '.'), 2),
+PARSENAME (replace(OwnerAddress, ',', '.'), 1)
+from PortfolioProject.dbo.Nashville_Housing
+
+
+ALTER TABLE Nashville_Housing
+Add OwnerSplitAddress Nvarchar(255);
+
+Update Nashville_Housing
+Set OwnerSplitAddress = PARSENAME (replace(OwnerAddress, ',', '.'), 3)
+
+ALTER TABLE Nashville_Housing
+Add OwnerSplitCity Nvarchar(255);
+
+Update Nashville_Housing
+Set OwnerSplitCity = PARSENAME (replace(OwnerAddress, ',', '.'), 2)
+
+ALTER TABLE Nashville_Housing
+Add OwnerSplitState Nvarchar(255);
+
+Update Nashville_Housing
+Set OwnerSplitState = PARSENAME (replace(OwnerAddress, ',', '.'), 1)
+
+
+-- Change Y and N to Yes and No in "Sold as Vacant" field
+
+Select distinct SoldAsVacant, count(SoldAsVacant)
+from PortfolioProject.dbo.Nashville_Housing
+group by SoldAsVacant
+order by 2
+
+Select SoldAsVacant,
+    Case when SoldAsVacant = 'Y' then 'Yes'
+        when SoldAsVacant = 'N' then 'No'
+        else SoldAsVacant
+        end
+from PortfolioProject.dbo.Nashville_Housing
+
+
+Update Nashville_Housing
+SET SoldAsVacant = 
+    Case when SoldAsVacant = 'Y' then 'Yes'
+        when SoldAsVacant = 'N' then 'No'
+        else SoldAsVacant
+        end
+
+
+
+-- Remove Duplicates
+
+WITH RowNumCTE as(
+select *,
+        row_number() over(partition by ParcelID,
+                                        PropertyAddress, 
+                                        SalePrice, 
+                                        SaleDate, 
+                                        LegalReference
+                                        order by UniqueID) row_num
+from PortfolioProject.dbo.Nashville_Housing
+-- order by ParcelID
+)
+
+/* DELETE
+from RowNumCTE
+where row_num > 1
+*/
+
+select *
+from RowNumCTE
+where row_num > 1
+order by PropertyAddress
+
+
+
+
+
+-- Delete unused columns
+
+Select *
+from PortfolioProject.dbo.Nashville_Housing
+
+ALTER TABLE PortfolioProject.dbo.Nashville_Housing
+DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress
+
+ALTER TABLE PortfolioProject.dbo.Nashville_Housing
+DROP COLUMN SaleDate
